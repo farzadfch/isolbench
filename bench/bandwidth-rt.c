@@ -202,7 +202,7 @@ void worker(void *param)
 	/*
 	 * actual memory access
 	 */
-	if (period > 0) make_periodic(period * 1000, info);
+	if (period > 0) make_periodic(period, info);
 	for (j = 0;; j++) {
 		unsigned int l_start, l_end, l_duration;
 		l_start = get_usecs();
@@ -377,6 +377,8 @@ int main(int argc, char *argv[])
 		signal(SIGALRM, &quit);
 		alarm(finish);
 	}
+
+  usleep(1000);
 
 	g_start = get_usecs();
 	

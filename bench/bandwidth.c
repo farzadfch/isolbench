@@ -32,6 +32,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+
 /**************************************************************************
  * Public Definitions
  **************************************************************************/
@@ -122,7 +123,7 @@ void usage(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 	int64_t sum = 0;
-	unsigned finish = 5;
+	unsigned finish = 5000;
 	int prio = 0;        
 	int num_processors;
 	int acc_type = READ;
@@ -203,13 +204,14 @@ int main(int argc, char *argv[])
 	       g_mem_size/1024,
 	       ((acc_type==READ) ?"read": "write"),
 		cpuid);
-	printf("stop at %d\n", finish);
+	printf("stop at %d ms\n", finish);
 
 	/* set signals to terminate once time has been reached */
 	signal(SIGINT, &quit);
+	signal(SIGTERM, &quit);
 	if (finish > 0) {
 		signal(SIGALRM, &quit);
-		alarm(finish);
+		ualarm(finish * 1000, 0);
 	}
 
 	/*

@@ -27,7 +27,7 @@ test_latency_vs_bandwidth()
 
         # launch a subject
 	[ -d "$CG_PALLOC_DIR" ] && echo $$ > $CG_PALLOC_DIR/subject/tasks
-	latency -m $size_in_kb_subject -c $startcpu -i 10000 -r 1 2> /dev/null > tmpout.txt
+	latency -m $size_in_kb_subject -c $startcpu -i 100 -r 1 2> /dev/null > tmpout.txt
 	    
         output=`grep average tmpout.txt | awk '{ print $2 }'`
 	log_echo $output
@@ -61,7 +61,7 @@ test_bandwidth_vs_bandwidth()
 
         # launch a subject
 	[ -d "$CG_PALLOC_DIR" ] && echo $$ > $CG_PALLOC_DIR/subject/tasks
-        bandwidth -m $size_in_kb_subject -t 4 -c $startcpu -r 1 2> /dev/null > tmpout.txt
+        bandwidth -m $size_in_kb_subject -t 1 -c $startcpu -r 1 2> /dev/null > tmpout.txt
         output=`grep average tmpout.txt | awk '{ print $10 }'`
 	log_echo $output
     done	
@@ -124,7 +124,9 @@ elif grep "Ryzen 3 2200G" /proc/cpuinfo; then
     llc_ws=1024
     dram_ws=16384
 else
-    error "CPU specific 'llc_ws' and 'dram_ws' variables are not set"
+    #error "CPU specific 'llc_ws' and 'dram_ws' variables are not set"
+    llc_ws=16384
+    dram_ws=16384
 fi
 
 size_in_kb_subject=$llc_ws
@@ -133,9 +135,9 @@ outputfile=log.txt
 startcpu=$1
 [ -z "$startcpu" ] && startcpu=0
 
-test_latency_vs_bandwidth $dram_ws "read" $startcpu
-test_bandwidth_vs_bandwidth $dram_ws "read" $startcpu
-test_bandwidth_vs_bandwidth $llc_ws "read" $startcpu
+#test_latency_vs_bandwidth $dram_ws "read" $startcpu
+#test_bandwidth_vs_bandwidth $dram_ws "read" $startcpu
+#test_bandwidth_vs_bandwidth $llc_ws "read" $startcpu
 test_latency_vs_bandwidth $dram_ws "write" $startcpu
-test_bandwidth_vs_bandwidth $dram_ws "write" $startcpu
-test_bandwidth_vs_bandwidth $llc_ws "write" $startcpu
+#test_bandwidth_vs_bandwidth $dram_ws "write" $startcpu
+#test_bandwidth_vs_bandwidth $llc_ws "write" $startcpu
