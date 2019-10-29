@@ -307,7 +307,7 @@ int main(int argc, char *argv[])
 	/*
 	 * get command line options 
 	 */
-	while ((opt = getopt_long(argc, argv, "m:n:a:t:c:r:p:i:j:l:hv:o:s",
+	while ((opt = getopt_long(argc, argv, "m:n:a:t:c:r:p:i:j:l:hv:os",
 				  long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 'm': /* set memory size */
