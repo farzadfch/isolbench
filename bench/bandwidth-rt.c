@@ -45,6 +45,12 @@
 #define MAX(a,b) ((a>b)?(a):(b))
 #define MIN(a,b) ((a>b)?(b):(a))
 
+#ifdef __riscv
+#define read_csr_safe(reg) ({ register long __tmp asm("a0"); \
+  asm volatile ("csrr %0, " #reg : "=r"(__tmp)); \
+  __tmp; })
+#endif
+
 /**************************************************************************
  * Public Types
  **************************************************************************/
@@ -75,9 +81,14 @@ int period = 0; /* in ms */
 int verbose = 0;
 int cpuid = 0;
 int thread_local = 0;
+int save_job_dur = 0;
 
 volatile uint64_t g_nread = 0;	           /* number of bytes read */
 volatile unsigned int g_start;		   /* starting time */
+#ifdef __riscv
+long start_cycle;
+#endif
+unsigned int *dur_ptr = 0;
 
 /**************************************************************************
  * Public Functions
@@ -93,6 +104,13 @@ void quit(int param)
 {
 	float dur_in_sec;
 	float bw;
+#ifdef __riscv
+  long end_cycle = read_csr_safe(cycle);
+#endif
+  if (save_job_dur)
+    for (int i = 0; i < jobs; i++) {
+      printf("duration %d: %u\n", i, dur_ptr[i]);
+    }
 	float dur = get_usecs() - g_start;
 	dur_in_sec = (float)dur / 1000000;
 	printf("g_nread(bytes read) = %lld\n", (long long)g_nread);
@@ -100,6 +118,9 @@ void quit(int param)
 	bw = (float)g_nread / dur_in_sec / 1024 / 1024;
 	printf("CPU%d: B/W = %.2f MB/s | ",cpuid, bw);
 	printf("CPU%d: average = %.2f ns\n", cpuid, (dur*1000)/(g_nread/CACHE_LINE_SIZE));
+#ifdef __riscv
+  printf("Start cycle: %lu\nEnd cycle: %lu\n", start_cycle, end_cycle);
+#endif
 	exit(0);
 }
 
@@ -223,6 +244,7 @@ void worker(void *param)
 		l_duration = l_end - l_start;
 		if (period > 0) wait_period (info);
 		if (verbose) fprintf(stderr, "\nJob %d Took %d us", j, l_duration);
+    if (save_job_dur) dur_ptr[j] = l_duration;
 		if (jobs == 0 || j+1 >= jobs)
 			break;
 	}
@@ -285,7 +307,7 @@ int main(int argc, char *argv[])
 	/*
 	 * get command line options 
 	 */
-	while ((opt = getopt_long(argc, argv, "m:n:a:t:c:r:p:i:j:l:hv:o",
+	while ((opt = getopt_long(argc, argv, "m:n:a:t:c:r:p:i:j:l:hv:o:s",
 				  long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 'm': /* set memory size */
@@ -348,6 +370,9 @@ int main(int argc, char *argv[])
 		case 'o':
 			thread_local = 1;
 			break;
+    case 's':
+      save_job_dur = 1;
+      break;
 		}
 	}
 
@@ -356,6 +381,9 @@ int main(int argc, char *argv[])
 	 */
 	g_mem_ptr = malloc(g_mem_size);
 	memset(g_mem_ptr, 1, g_mem_size);
+
+  if (save_job_dur)
+    dur_ptr = malloc(jobs * sizeof(signed int));
 
 	/* print experiment info before starting */
 	printf("mem=%d KB (%s), type=%s, nthreads=%d cpuid=%d, iterations=%d, jobs=%d, period=%d\n",
@@ -381,6 +409,9 @@ int main(int argc, char *argv[])
   usleep(1000);
 
 	g_start = get_usecs();
+#ifdef __riscv
+  start_cycle = read_csr_safe(cycle);
+#endif
 	
 	/* thread affinity set */
 	for (i = 0; i < MIN(g_nthreads, num_processors); i++) {
