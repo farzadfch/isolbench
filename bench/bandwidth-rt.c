@@ -71,6 +71,7 @@ struct periodic_info
  **************************************************************************/
 int g_mem_size = DEFAULT_ALLOC_SIZE_KB * 1024;	   /* memory size */
 char *g_mem_ptr = 0;		   /* pointer to allocated memory region */
+int d_mem_size;
 
 int g_nthreads = 1;
 volatile int g_njoin = 0;
@@ -126,24 +127,28 @@ void quit(int param)
 
 int64_t bench_read(char *mem_ptr)
 {
-	int i;	
+	static int i = 0;
 	int64_t sum = 0;
-	for ( i = 0; i < g_mem_size; i+=(CACHE_LINE_SIZE) ) {
+	int mem_size = i + d_mem_size;
+	for (; i < mem_size; i+=(CACHE_LINE_SIZE) ) {
 		sum += mem_ptr[i];
 	}
+  if (i == g_mem_size) i = 0;
 	// g_nread += g_mem_size;	
-	__atomic_fetch_add(&g_nread, g_mem_size, __ATOMIC_SEQ_CST);
+	__atomic_fetch_add(&g_nread, d_mem_size, __ATOMIC_SEQ_CST);
 	return sum;
 }
 
 int bench_write(char *mem_ptr)
 {
-	register int i;
-	for ( i = 0; i < g_mem_size; i+=(CACHE_LINE_SIZE) ) {
+	static int i = 0;
+	int mem_size = i + d_mem_size;
+	for (; i < mem_size; i+=(CACHE_LINE_SIZE) ) {
 		mem_ptr[i] = 0xff;
 	}
+  if (i == g_mem_size) i = 0;
 	// g_nread += g_mem_size;	
-	__atomic_fetch_add(&g_nread, g_mem_size, __ATOMIC_SEQ_CST);	
+	__atomic_fetch_add(&g_nread, d_mem_size, __ATOMIC_SEQ_CST);
 	return 1;
 }
 
@@ -291,6 +296,7 @@ int main(int argc, char *argv[])
 	struct periodic_info info[32];
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
+  int divisor_mem_size = 1;
 	
 	static struct option long_options[] = {
 		{"threads", required_argument, 0,  'n' },		
@@ -307,7 +313,7 @@ int main(int argc, char *argv[])
 	/*
 	 * get command line options 
 	 */
-	while ((opt = getopt_long(argc, argv, "m:n:a:t:c:r:p:i:j:l:hv:os",
+	while ((opt = getopt_long(argc, argv, "m:n:a:t:c:r:p:i:j:l:hv:osd:",
 				  long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 'm': /* set memory size */
@@ -373,8 +379,18 @@ int main(int argc, char *argv[])
     case 's':
       save_job_dur = 1;
       break;
+		case 'd':
+			divisor_mem_size = strtol(optarg, NULL, 0);
+			break;
 		}
 	}
+
+  if (g_mem_size % divisor_mem_size) {
+    fprintf(stderr, "%d is not divisible by %d\n", g_mem_size, divisor_mem_size);
+    exit(1);
+  }
+
+  d_mem_size = g_mem_size / divisor_mem_size;
 
 	/*
 	 * allocate contiguous region of memory 
