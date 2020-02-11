@@ -42,6 +42,8 @@
 #  define DEFAULT_ALLOC_SIZE_KB 16384
 #endif
 
+#define MEGA_BYTE (1000 * 1000)
+
 #define MAX(a,b) ((a>b)?(a):(b))
 #define MIN(a,b) ((a>b)?(b):(a))
 
@@ -116,7 +118,7 @@ void quit(int param)
 	dur_in_sec = (float)dur / 1000000;
 	printf("g_nread(bytes read) = %lld\n", (long long)g_nread);
 	printf("elapsed = %.2f sec ( %.0f usec )\n", dur_in_sec, dur);
-	bw = (float)g_nread / dur_in_sec / 1024 / 1024;
+	bw = (float)g_nread / dur_in_sec / MEGA_BYTE;
 	printf("CPU%d: B/W = %.2f MB/s | ",cpuid, bw);
 	printf("CPU%d: average = %.2f ns\n", cpuid, (dur*1000)/(g_nread/CACHE_LINE_SIZE));
 #ifdef __riscv
