@@ -1,0 +1,6 @@
+*.o
+/bench/bandwidth
+/bench/bandwidth-rt
+/bench/latency
+/bench/latency-mlp
+/bench/pagetype
