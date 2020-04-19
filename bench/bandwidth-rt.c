@@ -89,9 +89,9 @@ int save_job_dur = 0;
 volatile uint64_t g_nread = 0;	           /* number of bytes read */
 volatile unsigned int g_start;		   /* starting time */
 #ifdef __riscv
-long start_cycle;
+long start_cycle, end_cycle;
 #endif
-unsigned int *dur_ptr = 0;
+uint64_t *dur_ptr = 0;
 
 /**************************************************************************
  * Public Functions
@@ -103,16 +103,21 @@ unsigned int get_usecs()
 	return (time.tv_sec * 1000000 +	time.tv_usec);
 }
 
+uint64_t get_nsecs()
+{
+  struct timespec time;
+  clock_gettime(CLOCK_REALTIME, &time);
+  return (time.tv_sec * 1000000000 + time.tv_nsec);
+}
+
 void quit(int param)
 {
 	float dur_in_sec;
 	float bw;
-#ifdef __riscv
-  long end_cycle = read_csr_safe(cycle);
-#endif
+
   if (save_job_dur)
     for (int i = 0; i < jobs; i++) {
-      printf("duration %d: %u\n", i, dur_ptr[i]);
+      printf("duration %d: %.3f\n", i, (float)dur_ptr[i]/1000);
     }
 	float dur = get_usecs() - g_start;
 	dur_in_sec = (float)dur / 1000000;
@@ -231,9 +236,12 @@ void worker(void *param)
 	 * actual memory access
 	 */
 	if (period > 0) make_periodic(period, info);
+#ifdef __riscv
+  start_cycle = read_csr_safe(cycle);
+#endif
 	for (j = 0;; j++) {
-		unsigned int l_start, l_end, l_duration;
-		l_start = get_usecs();
+		uint64_t l_start, l_end, l_duration;
+		l_start = get_nsecs();
 		for (i = 0;; i++) {
 			switch (acc_type) {
 			case READ:
@@ -247,14 +255,17 @@ void worker(void *param)
 			if (iterations > 0 && i+1 >= iterations)
 				break;
 		}
-		l_end = get_usecs();
+		l_end = get_nsecs();
 		l_duration = l_end - l_start;
 		if (period > 0) wait_period (info);
-		if (verbose) fprintf(stderr, "\nJob %d Took %d us", j, l_duration);
+		if (verbose) fprintf(stderr, "\nJob %d Took %lu ns", j, l_duration);
     if (save_job_dur) dur_ptr[j] = l_duration;
 		if (jobs == 0 || j+1 >= jobs)
 			break;
 	}
+#ifdef __riscv
+  end_cycle = read_csr_safe(cycle);
+#endif
 	if (verbose) {
 		printf("thread %d completed: wakeup misses=%d\n",
 		       info->id, info->wakeups_missed);
@@ -401,7 +412,7 @@ int main(int argc, char *argv[])
 	memset(g_mem_ptr, 1, g_mem_size);
 
   if (save_job_dur)
-    dur_ptr = malloc(jobs * sizeof(signed int));
+    dur_ptr = malloc(jobs * sizeof(uint64_t));
 
 	/* print experiment info before starting */
 	printf("mem=%d KB (%s), type=%s, nthreads=%d cpuid=%d, iterations=%d, jobs=%d, period=%d\n",
@@ -425,11 +436,7 @@ int main(int argc, char *argv[])
 	}
 
   usleep(1000);
-
 	g_start = get_usecs();
-#ifdef __riscv
-  start_cycle = read_csr_safe(cycle);
-#endif
 	
 	/* thread affinity set */
 	for (i = 0; i < MIN(g_nthreads, num_processors); i++) {
